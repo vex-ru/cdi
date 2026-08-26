@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# CrystalDiskInfo CLI — Финальная версия с умной установкой зависимостей
+# CrystalDiskInfo CLI — Финальная версия (исправлена работа с curl | bash)
 # ============================================================================
 
 if [ "$EUID" -ne 0 ] && [ -x /usr/bin/sudo ]; then
@@ -22,7 +22,6 @@ CIRCLE_UNKNOWN="${GRAY}[?]${RESET}"
 
 check_dependencies() {
     local missing=()
-    
     if ! command -v smartctl &>/dev/null; then missing+=("smartctl (smartmontools)"); fi
     if ! command -v lsblk &>/dev/null; then missing+=("lsblk (util-linux)"); fi
     if ! command -v column &>/dev/null; then missing+=("column (util-linux)"); fi
@@ -36,14 +35,11 @@ check_dependencies() {
     fi
 }
 
-# ============================================================================
-# Умная проверка и установка xclip ТОЛЬКО при генерации отчёта
-# ============================================================================
 ensure_clipboard_tool() {
     if ! command -v xclip &>/dev/null && ! command -v xsel &>/dev/null; then
         echo -e "${YELLOW}⚠️ Для копирования ссылки отчёта в буфер обмена требуется утилита 'xclip' или 'xsel'.${RESET}"
         echo -n "Установить 'xclip' сейчас? (y/n): "
-        read -r install_choice
+        read -r install_choice < /dev/tty # <--- ИСПРАВЛЕНО
         
         if [[ "$install_choice" =~ ^[YyДyд]$ ]]; then
             echo "⏳ Установка..."
@@ -130,8 +126,7 @@ parse_disk_info() {
     DISK_FIRMWARE=$(echo "$full_info" | grep -i "Firmware Version" | sed 's/.*: //')
     [ -z "$DISK_FIRMWARE" ] && DISK_FIRMWARE="N/A"
     
-    if $IS_NVME; then
-        DISK_INTERFACE="NVMe"
+    if $IS_NVME; then DISK_INTERFACE="NVMe"
     else
         local sata_ver=$(echo "$full_info" | grep -i "SATA Version" | sed 's/.*: //')
         DISK_INTERFACE="${sata_ver:-SATA}"
@@ -475,7 +470,7 @@ interactive_menu() {
         echo "  0) Выход"
         echo ""
         echo -n "Ваш выбор: "
-        read -r choice
+        read -r choice < /dev/tty # <--- ИСПРАВЛЕНО
         
         if [ "$choice" = "0" ]; then
             echo "Выход..."
@@ -483,10 +478,9 @@ interactive_menu() {
         elif [ "$choice" = "G" ] || [ "$choice" = "g" ]; then
             echo ""
             echo -n "Введите номер диска (1-${#DISKS[@]}): "
-            read -r disk_num
+            read -r disk_num < /dev/tty # <--- ИСПРАВЛЕНО
             
             if [[ "$disk_num" =~ ^[0-9]+$ ]] && [ "$disk_num" -ge 1 ] && [ "$disk_num" -le "${#DISKS[@]}" ]; then
-                # === ЗДЕСЬ ПРОИСХОДИТ ПРОВЕРКА И УСТАНОВКА XCLIP ===
                 ensure_clipboard_tool
                 
                 local index=$((disk_num - 1))
@@ -499,7 +493,7 @@ interactive_menu() {
                 
                 echo ""
                 echo -e "${GRAY}Нажмите Enter для продолжения...${RESET}"
-                read -r
+                read -r < /dev/tty # <--- ИСПРАВЛЕНО
             else
                 echo -e "${RED}Неверный номер диска!${RESET}"
                 sleep 2
@@ -520,7 +514,7 @@ interactive_menu() {
             
             echo ""
             echo -e "${GRAY}Нажмите Enter для возврата в меню...${RESET}"
-            read -r
+            read -r < /dev/tty # <--- ИСПРАВЛЕНО
         else
             echo -e "${RED}Неверный выбор!${RESET}"
             sleep 2
